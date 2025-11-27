@@ -10,6 +10,7 @@ import (
 func main() {
 	router := gin.New()
 	config.Connection()
+	config.InitRedis()
 	routes.UserRoute(router)
 	router.Run(":8080")
 }
