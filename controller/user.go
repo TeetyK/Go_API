@@ -19,6 +19,8 @@ const (
 func GetUsers(c *gin.Context) {
 	if config.RedisClient != nil {
 		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
 		cacheData, err := config.RedisClient.Get(ctx, UserCacheKey).Result()
 		if err == nil {
 			user := []models.User{}
