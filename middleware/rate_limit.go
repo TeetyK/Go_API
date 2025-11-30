@@ -25,18 +25,21 @@ func RateLimiter() gin.HandlerFunc {
 		ip := c.ClientIP()
 		key := "rate_limit:" + ip
 
-		// เพิ่มค่าใน key นี้, ถ้า key ไม่มีอยู่จะถูกสร้างและมีค่าเป็น 1
-		count, err := config.RedisClient.Incr(c.Request.Context(), key).Result()
+		// ใช้ Pipeline เพื่อให้การทำงานของ INCR และ EXPIRE เกิดขึ้นพร้อมกัน (Atomic)
+		var count int64
+		pipe := config.RedisClient.Pipeline()
+		incr := pipe.Incr(c.Request.Context(), key)
+		// ตั้งค่า Expire ทุกครั้งที่เรียก เพื่อความแน่นอนและป้องกัน Race Condition
+		pipe.Expire(c.Request.Context(), key, rateLimitPeriod)
+		_, err := pipe.Exec(c.Request.Context())
+
 		if err != nil {
 			// ถ้า Redis มีปัญหา ก็ปล่อยผ่านไปก่อน แต่ควร log error ไว้
 			c.Next()
 			return
 		}
 
-		// ถ้าเป็นการสร้าง key ครั้งแรก (count == 1) ให้ตั้งเวลาหมดอายุ
-		if count == 1 {
-			config.RedisClient.Expire(c.Request.Context(), key, rateLimitPeriod)
-		}
+		count = incr.Val()
 
 		if count > rateLimitCount {
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many requests"})
