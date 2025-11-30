@@ -119,8 +119,15 @@ func UpdateUser(c *gin.Context) {
 	}
 	config.DB.Save(&user)
 	if config.RedisClient != nil {
-		config.RedisClient.Del(c.Request.Context(), UserCacheKey)
+		// Invalidate cache
+		go config.RedisClient.Del(c.Request.Context(), UserCacheKey)
+		go config.RedisClient.Del(c.Request.Context(), "user:"+c.Param("id"))
+
+		// Publish update event
+		updateMsg, _ := json.Marshal(gin.H{"event": "user_updated", "user_id": user.Id})
+		go config.RedisClient.Publish(c.Request.Context(), "user_updates", updateMsg)
 	}
+
 	c.JSON(http.StatusOK, &user)
 }
 
@@ -201,9 +208,9 @@ func Login(c *gin.Context) {
 	// 4. สร้าง JWT Token
 	//    สร้าง claims สำหรับ token
 	claims := jwt.MapClaims{
-		"sub": user.Id,                              // Subject (user's ID)
-		"exp": time.Now().Add(time.Hour * 1).Unix(), // Expiration time (24 hours)
-		"iat": time.Now().Unix(),                    // Issued at
+		"sub": user.Id,                               // Subject (user's ID)
+		"exp": time.Now().Add(time.Hour * 24).Unix(), // Expiration time (24 hours)
+		"iat": time.Now().Unix(),                     // Issued at
 	}
 
 	// สร้าง token object
