@@ -12,5 +12,6 @@ func main() {
 	config.Connection()
 	config.InitRedis()
 	routes.UserRoute(router)
+	routes.ProductRoute(router)
 	router.Run(":8080")
 }
