@@ -5,13 +5,16 @@ import (
 	"API/models"
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 const (
@@ -19,45 +22,47 @@ const (
 	UserCacheTTL = 5 * time.Minute
 )
 
-func GetUsers(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	if config.RedisClient != nil {
-		cacheCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-
-		cacheData, err := config.RedisClient.Get(cacheCtx, UserCacheKey).Result()
-		// redis.Nil means cache miss, which is not a real error for us.
-		if err == nil { // Cache hit
-			user := []models.User{}
-			if err := json.Unmarshal([]byte(cacheData), &user); err == nil {
-				c.JSON(http.StatusOK, gin.H{"source": "cache", "data": user})
-				return
-			}
-			// Log error if unmarshal fails, then proceed to fetch from DB
+func Paging(page, pageSize int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if page <= 0 {
+			page = 1
 		}
+		if pageSize <= 0 {
+			pageSize = 10
+		} else if pageSize > 100 {
+			pageSize = 100
+		}
+		offset := (page - 1) * pageSize
+		return db.Offset(offset).Limit(pageSize)
 	}
-
-	// Cache miss or Redis is unavailable, fetch from database
+}
+func GetUsers(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "3"))
+	ctx := c.Request.Context()
 	user := []models.User{}
+	var total int64
+	db := config.DB.Model(&models.User{})
 	if result := config.DB.WithContext(ctx).Find(&user); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users from database"})
 		return
 	}
-
-	if config.RedisClient != nil {
-		userJSON, err := json.Marshal(user)
-		if err == nil {
-			setCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-			defer cancel()
-			// Set cache in the background, log error if it fails but don't block the response
-			go config.RedisClient.Set(setCtx, UserCacheKey, userJSON, UserCacheTTL)
-		}
+	if err := db.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not count users"})
+		return
 	}
-
+	if err := db.Scopes(Paging(page, limit)).Find(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"source": "database",
-		"data":   user,
+		"data": user,
+		"meta": gin.H{
+			"total":     total,
+			"page":      page,
+			"limit":     limit,
+			"last_page": int(math.Ceil(float64(total) / float64(limit))),
+		},
 	})
 }
 
@@ -108,8 +113,9 @@ func GetUserID(c *gin.Context) {
 
 func UpdateUser(c *gin.Context) {
 	var user models.User
-	result := config.DB.Where("?", c.Param("id")).First(&user)
-	if result.Error != nil {
+	id := c.Param("id")
+
+	if err := config.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -119,9 +125,9 @@ func UpdateUser(c *gin.Context) {
 	}
 	config.DB.Save(&user)
 	if config.RedisClient != nil {
-		// Invalidate cache
-		go config.RedisClient.Del(c.Request.Context(), UserCacheKey)
-		go config.RedisClient.Del(c.Request.Context(), "user:"+c.Param("id"))
+
+		ctx := c.Request.Context()
+		go config.RedisClient.Del(ctx, "user:"+id)
 
 		// Publish update event
 		updateMsg, _ := json.Marshal(gin.H{"event": "user_updated", "user_id": user.Id})
@@ -157,7 +163,9 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	if config.RedisClient != nil {
-		config.RedisClient.Del(c.Request.Context(), UserCacheKey)
+		// When a new user is created, we don't need to do anything to the cache
+		// until that specific user is requested for the first time.
+		// No need to invalidate "all_users".
 	}
 	c.JSON(http.StatusCreated, &user)
 }
@@ -167,12 +175,25 @@ func DeleteUser(c *gin.Context) {
 	result := config.DB.Where("id = ?", c.Param("id")).Delete(&user)
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"message": "User not found or already deleted."})
-		return
+		id := c.Param("id")
+
+		// It's better to find the user first to ensure it exists.
+		if err := config.DB.First(&user, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"message": "User not found."})
+			return
+		}
+
+		// Now delete the user
+		if err := config.DB.Delete(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to delete user."})
+			return
+		}
+		if config.RedisClient != nil {
+			ctx := c.Request.Context()
+			go config.RedisClient.Del(ctx, "user:"+id)
+		}
+		c.JSON(http.StatusNoContent, nil)
 	}
-	if config.RedisClient != nil {
-		config.RedisClient.Del(c.Request.Context(), UserCacheKey)
-	}
-	c.JSON(http.StatusNoContent, nil)
 }
 
 type LoginInput struct {
@@ -182,7 +203,7 @@ type LoginInput struct {
 
 func Login(c *gin.Context) {
 	var input LoginInput
-	var user models.User // สมมติว่านี่คือ User model ของคุณ
+	var user models.User
 
 	// 1. Bind JSON body เข้ากับ struct
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -190,38 +211,29 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 2. ค้นหา user จาก email ในฐานข้อมูล
-	//    (โค้ดส่วนนี้ต้องปรับให้เข้ากับ DB logic ของคุณ)
 	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	// 3. เปรียบเทียบ password ที่ส่งมากับ hash ใน DB
 	err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password))
 	if err != nil {
-		// ถ้า password ไม่ตรงกัน
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	// 4. สร้าง JWT Token
-	//    สร้าง claims สำหรับ token
 	claims := jwt.MapClaims{
 		"sub": user.Id,                               // Subject (user's ID)
 		"exp": time.Now().Add(time.Hour * 24).Unix(), // Expiration time (24 hours)
 		"iat": time.Now().Unix(),                     // Issued at
 	}
 
-	// สร้าง token object
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// เซ็น token ด้วย secret key ของคุณ (ควรเก็บไว้ใน environment variable)
-	// ผมใช้ "YOUR_SECRET_KEY" เป็นตัวอย่าง คุณควรเปลี่ยนเป็นค่าของคุณเอง
 	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "YOUR_SECRET_KEY" // fallback สำหรับ local dev
-	}
+	// if jwtSecret == "" {
+	// 	jwtSecret = "YOUR_SECRET_KEY" // fallback สำหรับ local dev
+	// }
 
 	t, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
