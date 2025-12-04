@@ -40,23 +40,28 @@ func GetUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "3"))
 	ctx := c.Request.Context()
-	user := []models.User{}
+	users := []models.User{}
 	var total int64
 	db := config.DB.Model(&models.User{})
-	if result := config.DB.WithContext(ctx).Find(&user); result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users from database"})
-		return
-	}
-	if err := db.Count(&total).Error; err != nil {
+	// if result := config.DB.WithContext(ctx).Find(&user); result.Error != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users from database"})
+	// 	return
+	// }
+	// if err := db.Count(&total).Error; err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not count users"})
+	// 	return
+	// }
+	if err := db.WithContext(ctx).Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not count users"})
 		return
 	}
-	if err := db.Scopes(Paging(page, limit)).Find(&user).Error; err != nil {
+
+	if err := db.WithContext(ctx).Scopes(Paging(page, limit)).Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"data": user,
+		"data": users,
 		"meta": gin.H{
 			"total":     total,
 			"page":      page,
@@ -87,8 +92,7 @@ func GetUserID(c *gin.Context) {
 	}
 
 	var user models.User
-	result := config.DB.WithContext(ctx).First(&user, id)
-	if result.Error != nil {
+	if err := config.DB.WithContext(ctx).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -231,9 +235,10 @@ func Login(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
-	// if jwtSecret == "" {
-	// 	jwtSecret = "YOUR_SECRET_KEY" // fallback สำหรับ local dev
-	// }
+	if jwtSecret == "" {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "JWT is not configured on the server."})
+		return
+	}
 
 	t, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
