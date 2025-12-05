@@ -44,7 +44,7 @@ func RequireAuth(c *gin.Context) {
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		// ดึง User ID จาก claim 'sub'
-		userID, ok := claims["sub"].(float64) // JWT parse ตัวเลขเป็น float64
+		sub, ok := claims["sub"] // JWT parse ตัวเลขเป็น float64
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in token"})
 			return
@@ -52,7 +52,7 @@ func RequireAuth(c *gin.Context) {
 
 		var user models.User
 		// ค้นหาผู้ใช้ในฐานข้อมูลเพื่อให้แน่ใจว่าผู้ใช้ยังมีตัวตนอยู่
-		if err := config.DB.First(&user, uint(userID)).Error; err != nil {
+		if err := config.DB.First(&user, sub).Error; err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User associated with token not found"})
 			return
 		}

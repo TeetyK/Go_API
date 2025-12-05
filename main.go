@@ -4,6 +4,7 @@ import (
 	"API/config"
 	"API/controller"
 	"API/middleware"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,6 +23,17 @@ func main() {
 	authorized := router.Group("/")
 	authorized.Use(middleware.RequireAuth)
 	{
+		authorized.GET("/", func(c *gin.Context) {
+			user, exist := c.Get("user")
+			if !exist {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found in context"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Welcome to authorized area.",
+				"user":    user,
+			})
+		})
 		authorized.GET("/users", controller.GetUsers)
 		authorized.GET("/users/:id", controller.GetUserID)
 		authorized.PUT("/users/:id", controller.UpdateUser)
