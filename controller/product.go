@@ -17,13 +17,6 @@ const (
 	ProductCacheTTL     = 5 * time.Minute
 )
 
-// GetProducts godoc
-// @Summary Get all products
-// @Description Get a list of all products, with caching.
-// @Tags products
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /products [get]
 func GetProducts(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -57,14 +50,6 @@ func GetProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"source": "database", "data": products})
 }
 
-// GetProductByID godoc
-// @Summary Get a single product by its ID
-// @Description Get detailed information for a specific product.
-// @Tags products
-// @Produce json
-// @Param id path int true "Product ID"
-// @Success 200 {object} map[string]interface{}
-// @Router /products/{id} [get]
 func GetProductByID(c *gin.Context) {
 	ctx := c.Request.Context()
 	id := c.Param("id")
@@ -100,15 +85,6 @@ func GetProductByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"source": "database", "data": product})
 }
 
-// CreateProduct godoc
-// @Summary Create a new product
-// @Description Adds a new product to the database.
-// @Tags products
-// @Accept json
-// @Produce json
-// @Param product body models.Product true "Product object"
-// @Success 201 {object} models.Product
-// @Router /products [post]
 func CreateProduct(c *gin.Context) {
 	var product models.Product
 	if err := c.ShouldBindJSON(&product); err != nil {
@@ -120,8 +96,6 @@ func CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create product: " + result.Error.Error()})
 		return
 	}
-
-	// Invalidate cache for all products list
 	if config.RedisClient != nil {
 		go config.RedisClient.Del(context.Background(), AllProductsCacheKey)
 	}
@@ -129,16 +103,6 @@ func CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
-// UpdateProduct godoc
-// @Summary Update an existing product
-// @Description Updates a product's details by its ID.
-// @Tags products
-// @Accept json
-// @Produce json
-// @Param id path int true "Product ID"
-// @Param product body models.Product true "Product object"
-// @Success 200 {object} models.Product
-// @Router /products/{id} [put]
 func UpdateProduct(c *gin.Context) {
 	id := c.Param("id")
 	var product models.Product
@@ -165,14 +129,6 @@ func UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// DeleteProduct godoc
-// @Summary Delete a product
-// @Description Deletes a product by its ID.
-// @Tags products
-// @Produce json
-// @Param id path int true "Product ID"
-// @Success 204 "No Content"
-// @Router /products/{id} [delete]
 func DeleteProduct(c *gin.Context) {
 	id := c.Param("id")
 

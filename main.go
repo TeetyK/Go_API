@@ -17,6 +17,7 @@ func main() {
 	// routes.ProductRoute(router)
 
 	router := gin.Default()
+	router.Use(middleware.CORSMiddleware())
 	router.POST("/login", middleware.RateLimiter(), controller.Login)
 	router.POST("/users", controller.CreateUser)
 
