@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+
+  api-golang:
+    build: .
+    ports:
+      - "8080:8080"
+  memory-cache:
+    image: redis:latest
+    ports:
+      - "6379:6379"

@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -10,9 +11,20 @@ import (
 var RedisClient *redis.Client
 
 func InitRedis() {
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "127.0.0.1"
+	}
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+
+	redisAddr := fmt.Sprintf("%s:%s", redisHost, redisPort)
+
 	RedisClient = redis.NewClient(
 		&redis.Options{
-			Addr:     "127.0.0.1:6379",
+			Addr:     redisAddr,
 			Password: "",
 			DB:       0,
 		})
