@@ -14,4 +14,5 @@ func UserRoute(router *gin.Engine) {
 	router.DELETE("/:id", controller.DeleteUser)
 	router.PUT("/:id", controller.UpdateUser)
 	router.POST("/login", middleware.RateLimiter(), controller.Login) // เพิ่มบรรทัดนี้
+	router.POST("/register", middleware.RateLimiter(), controller.CreateUser)
 }

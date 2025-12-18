@@ -43,14 +43,7 @@ func GetUsers(c *gin.Context) {
 	users := []models.User{}
 	var total int64
 	db := config.DB.Model(&models.User{})
-	// if result := config.DB.WithContext(ctx).Find(&user); result.Error != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch users from database"})
-	// 	return
-	// }
-	// if err := db.Count(&total).Error; err != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not count users"})
-	// 	return
-	// }
+
 	if err := db.WithContext(ctx).Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not count users"})
 		return
@@ -76,7 +69,7 @@ func GetUserID(c *gin.Context) {
 	id := c.Param("id")
 	userCacheKey := "user:" + id // สร้าง cache key เฉพาะสำหรับ user คนนี้
 
-	// 1. ตรวจสอบใน Redis Cache ก่อน
+	// ตรวจสอบใน Redis Cache ก่อน
 	if config.RedisClient != nil {
 		cacheCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
@@ -97,7 +90,7 @@ func GetUserID(c *gin.Context) {
 		return
 	}
 
-	// 3. นำข้อมูลที่ได้จากฐานข้อมูลไปเก็บใน Cache สำหรับการเรียกครั้งต่อไป
+	// นำข้อมูลที่ได้จากฐานข้อมูลไปเก็บใน Cache สำหรับการเรียกครั้งต่อไป
 	if config.RedisClient != nil {
 		userJSON, err := json.Marshal(user)
 		if err == nil {
@@ -167,9 +160,7 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	if config.RedisClient != nil {
-		// When a new user is created, we don't need to do anything to the cache
-		// until that specific user is requested for the first time.
-		// No need to invalidate "all_users".
+		// Nonting
 	}
 	c.JSON(http.StatusCreated, &user)
 }

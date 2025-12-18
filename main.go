@@ -19,7 +19,11 @@ func main() {
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 	router.POST("/login", middleware.RateLimiter(), controller.Login)
-	router.POST("/users", controller.CreateUser)
+	router.POST("/register", middleware.RateLimiter(), controller.CreateUser)
+
+	// Note: The route below also creates a user, but without a rate limit.
+	// Consider removing it in favor of the /register endpoint.
+	// router.POST("/users", controller.CreateUser)
 
 	authorized := router.Group("/")
 	authorized.Use(middleware.RequireAuth)
