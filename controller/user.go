@@ -3,8 +3,12 @@ package controller
 import (
 	"API/config"
 	"API/models"
+	"API/utils"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -239,4 +243,114 @@ func Login(c *gin.Context) {
 
 	// ส่ง token กลับไป
 	c.JSON(http.StatusOK, gin.H{"token": t})
+}
+
+func ForgotPassword(c *gin.Context) {
+	var input struct {
+		Email string `json:"email" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var user models.User
+	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "If an account with that email exists, a password reset link has been sent."})
+		return
+	}
+
+	// Generate a secure, random token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+		return
+	}
+	resetToken := hex.EncodeToString(tokenBytes)
+
+	// Hash the token for storage in the database
+	hashedToken, err := bcrypt.GenerateFromPassword([]byte(resetToken), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash reset token"})
+		return
+	}
+
+	// Set an expiration time for the token (e.g., 15 minutes)
+	expirationTime := time.Now().Add(15 * time.Minute)
+
+	// Update the user record with the hashed token and expiration time
+	user.PasswordResetToken = new(string)
+	*user.PasswordResetToken = string(hashedToken)
+	user.PasswordResetExpires = &expirationTime
+
+	if err := config.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save reset token"})
+		return
+	}
+
+	// Send the 'resetToken' (the un-hashed version) to the user's email.
+	if err := utils.SendPasswordResetEmail(user.Email, resetToken); err != nil {
+		// Even if email fails, we don't want to leak info.
+		// The user can try again. In a real app, you'd have more robust logging/monitoring here.
+		log.Printf("CRITICAL: Failed to send password reset email to %s: %v", user.Email, err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "If an account with that email exists, a password reset link has been sent."})
+}
+
+// ResetPassword handles the logic for resetting a password with a valid token.
+func ResetPassword(c *gin.Context) {
+	var input struct {
+		Token    string `json:"token" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Find users with a non-expired reset token
+	var users []models.User
+	now := time.Now()
+	config.DB.Where("password_reset_expires IS NOT NULL AND password_reset_expires > ?", now).Find(&users)
+
+	var foundUser *models.User
+	for i := range users {
+		user := users[i]
+		if user.PasswordResetToken != nil {
+			// Compare the provided token with the hashed token in the database
+			err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordResetToken), []byte(input.Token))
+			if err == nil {
+				// Found the user
+				foundUser = &user
+				break
+			}
+		}
+	}
+
+	if foundUser == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired password reset token."})
+		return
+	}
+
+	// Hash the new password
+	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash new password"})
+		return
+	}
+
+	// Update the user's password and clear the reset token fields
+	foundUser.PasswordHash = string(newHashedPassword)
+	foundUser.PasswordResetToken = nil
+	foundUser.PasswordResetExpires = nil
+
+	if err := config.DB.Save(foundUser).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
 }
