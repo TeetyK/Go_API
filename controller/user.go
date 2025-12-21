@@ -5,9 +5,8 @@ import (
 	"API/models"
 	"API/utils"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -261,38 +260,27 @@ func ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Generate a secure, random token
-	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+	// Generate a JWT token for password reset
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":  user.Id,
+		"exp":  time.Now().Add(15 * time.Minute).Unix(),
+		"type": "reset_password",
+	})
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT secret not configured"})
 		return
 	}
-	resetToken := hex.EncodeToString(tokenBytes)
 
-	// Hash the token for storage in the database
-	hashedToken, err := bcrypt.GenerateFromPassword([]byte(resetToken), bcrypt.DefaultCost)
+	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash reset token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
-	// Set an expiration time for the token (e.g., 15 minutes)
-	expirationTime := time.Now().Add(15 * time.Minute)
-
-	// Update the user record with the hashed token and expiration time
-	user.PasswordResetToken = new(string)
-	*user.PasswordResetToken = string(hashedToken)
-	user.PasswordResetExpires = &expirationTime
-
-	if err := config.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save reset token"})
-		return
-	}
-
-	// Send the 'resetToken' (the un-hashed version) to the user's email.
-	if err := utils.SendPasswordResetEmail(user.Email, resetToken); err != nil {
-		// Even if email fails, we don't want to leak info.
-		// The user can try again. In a real app, you'd have more robust logging/monitoring here.
+	// Send the JWT token to the user's email.
+	if err := utils.SendPasswordResetEmail(user.Email, tokenString); err != nil {
 		log.Printf("CRITICAL: Failed to send password reset email to %s: %v", user.Email, err)
 	}
 
@@ -311,27 +299,30 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Find users with a non-expired reset token
-	var users []models.User
-	now := time.Now()
-	config.DB.Where("password_reset_expires IS NOT NULL AND password_reset_expires > ?", now).Find(&users)
-
-	var foundUser *models.User
-	for i := range users {
-		user := users[i]
-		if user.PasswordResetToken != nil {
-			// Compare the provided token with the hashed token in the database
-			err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordResetToken), []byte(input.Token))
-			if err == nil {
-				// Found the user
-				foundUser = &user
-				break
-			}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	token, err := jwt.Parse(input.Token, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired token"})
+		return
 	}
 
-	if foundUser == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired password reset token."})
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || claims["type"] != "reset_password" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token type"})
+		return
+	}
+
+	// Extract user ID from claims
+	userID := uint(claims["sub"].(float64))
+	var foundUser models.User
+	if err := config.DB.First(&foundUser, userID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
 
@@ -342,12 +333,8 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Update the user's password and clear the reset token fields
-	foundUser.PasswordHash = string(newHashedPassword)
-	foundUser.PasswordResetToken = nil
-	foundUser.PasswordResetExpires = nil
-
-	if err := config.DB.Save(foundUser).Error; err != nil {
+	// Update only the password_hash field
+	if err := config.DB.Model(&foundUser).Update("password_hash", string(newHashedPassword)).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
 	}

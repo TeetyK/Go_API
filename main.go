@@ -20,8 +20,8 @@ func main() {
 	router.Use(middleware.CORSMiddleware())
 	router.POST("/login", middleware.RateLimiter(), controller.Login)
 	router.POST("/register", middleware.RateLimiter(), controller.CreateUser)
-	router.POST("/forgot-password", controller.ForgotPassword)
-	router.POST("/reset-password", controller.ResetPassword)
+	router.POST("/forgot-password", middleware.RateLimiter(), controller.ForgotPassword)
+	router.POST("/reset-password", middleware.RateLimiter(), controller.ResetPassword)
 	// Note: The route below also creates a user, but without a rate limit.
 	// Consider removing it in favor of the /register endpoint.
 	// router.POST("/users", controller.CreateUser)

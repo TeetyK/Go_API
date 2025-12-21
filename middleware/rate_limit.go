@@ -1,8 +1,7 @@
-// ในไฟล์ middleware/rate_limiter.go (ไฟล์ใหม่)
 package middleware
 
 import (
-	"API/config" // Import config ของคุณ
+	"API/config"
 	"net/http"
 	"time"
 
