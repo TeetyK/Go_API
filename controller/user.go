@@ -241,7 +241,7 @@ func Login(c *gin.Context) {
 	}
 
 	// ส่ง token กลับไป
-	c.JSON(http.StatusOK, gin.H{"token": t})
+	c.JSON(http.StatusOK, gin.H{"token": t, "role": user.Role})
 }
 
 func ForgotPassword(c *gin.Context) {

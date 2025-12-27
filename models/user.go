@@ -10,5 +10,6 @@ type User struct {
 	Username     string     `json:"username"`
 	Name         string     `json:"name"`
 	Email        string     `json:"email" gorm:"unique"`
+	Role         string     `json:"role"`
 	PasswordHash string     `json:"-"` // ซ่อน PasswordHash จาก JSON output
 }
