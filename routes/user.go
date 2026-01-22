@@ -15,6 +15,8 @@ func UserRoute(router *gin.Engine) {
 	router.PUT("/:id", controller.UpdateUser)
 	router.POST("/login", middleware.RateLimiter(), controller.Login) // เพิ่มบรรทัดนี้
 	router.POST("/register", middleware.RateLimiter(), controller.CreateUser)
-	router.POST("/forgot-password", middleware.RateLimiter(), controller.ForgotPassword)
-	router.POST("/reset-password", middleware.RateLimiter(), controller.ResetPassword)
+	// router.POST("/forgot-password", middleware.RateLimiter(), controller.ForgotPassword)
+	// router.POST("/reset-password", middleware.RateLimiter(), controller.ResetPassword)
+	router.POST("/forgot-password", middleware.RateLimiter(), controller.ForgotPasswordV2)
+	router.POST("/reset-password", middleware.RateLimiter(), controller.ResetPasswordV2)
 }

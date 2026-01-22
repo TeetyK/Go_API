@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -339,5 +340,29 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
+}
+func ForgotPasswordV2(c *gin.Context) {
+	resp, err := http.Get("http://localhost:8001/")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("Java ตอบกลับมาว่า:", string(body))
+	c.JSON(http.StatusOK, gin.H{"message": "If an account with that email exists, a password reset link has been sent."})
+}
+func ResetPasswordV2(c *gin.Context) {
+	resp, err := http.Get("http://localhost:8001/")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("Java ตอบกลับมาว่า:", string(body))
 	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
 }
