@@ -4,9 +4,11 @@ import (
 	"API/config"
 	"API/models"
 	"API/utils"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -342,20 +344,49 @@ func ResetPassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
 }
+
+type EmailRequest struct {
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
 func ForgotPasswordV2(c *gin.Context) {
-	resp, err := http.Get("http://localhost:8001/")
+	url := "http://localhost:8001/send-email"
+
+	requestData := EmailRequest{
+		Subject: "ทดสอบส่งอีเมล",
+		Body:    "ทดสอบอีเมล์ ที่ส่งไป Java Spring Boot จาก Golang API",
+	}
+
+	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Println("Error marshaling JSON:", err)
+		return
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("Java ตอบกลับมาว่า:", string(body))
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println("Response Status:", resp.Status)
+	fmt.Println("Response Body:", string(body))
+
 	c.JSON(http.StatusOK, gin.H{"message": "If an account with that email exists, a password reset link has been sent."})
 }
 func ResetPasswordV2(c *gin.Context) {
-	resp, err := http.Get("http://localhost:8001/")
+	resp, err := http.Post("http://localhost:8001/send-email", "application/json", nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -363,6 +394,6 @@ func ResetPasswordV2(c *gin.Context) {
 	defer resp.Body.Close()
 
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("Java ตอบกลับมาว่า:", string(body))
+	fmt.Println("Java Spring boot :", string(body))
 	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
 }
