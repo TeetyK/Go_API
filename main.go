@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	go startGrpcServer()
 	// router := gin.New()
 	config.Connection()
 	config.InitRedis()
