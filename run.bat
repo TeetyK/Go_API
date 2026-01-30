@@ -8,3 +8,5 @@ REM docker images
 REM docker run -d -p 8080:8080 api-go
 REM docker ps
 REM docker rmi -f {IMAGEID}
+
+@REM protoc --go_out=. --go-grpc_out=. proto/test.proto
