@@ -9,6 +9,45 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+// SendEmail sends a generic email using SMTP.
+// It reads configuration from environment variables:
+// SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+func SendEmail(to, subject, htmlBody string) error {
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPortStr := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
+
+	if smtpHost == "" || smtpPortStr == "" || smtpUser == "" || smtpPass == "" {
+		log.Println("WARNING: SMTP environment variables not fully configured. Falling back to console output.")
+		return logSimulatedGenericEmail(to, subject, htmlBody)
+	}
+
+	smtpPort, err := strconv.Atoi(smtpPortStr)
+	if err != nil {
+		log.Printf("ERROR: Invalid SMTP_PORT value: %v", err)
+		return err
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", smtpUser)
+	m.SetHeader("To", to)
+	m.SetHeader("Subject", subject)
+	m.SetBody("text/html", htmlBody)
+
+	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
+
+	log.Printf("Attempting to send email to %s via SMTP...", to)
+	if err := d.DialAndSend(m); err != nil {
+		log.Printf("ERROR: Failed to send email: %v", err)
+		return err
+	}
+
+	log.Printf("Successfully sent email to %s", to)
+	return nil
+}
+
+
 // SendPasswordResetEmail sends a real password reset email using SMTP.
 // It reads configuration from environment variables:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
@@ -65,6 +104,17 @@ func logSimulatedEmail(email, token string) error {
 	log.Printf("To: %s", email)
 	log.Printf("Subject: Reset Your Password")
 	log.Printf("Body: To reset your password, please click the following link: %s", resetLink)
+	log.Println("========================================================")
+	return nil
+}
+
+// logSimulatedGenericEmail is a fallback for the generic SendEmail function.
+func logSimulatedGenericEmail(to, subject, body string) error {
+	log.Println("========================================================")
+	log.Printf("SIMULATING SENDING GENERIC EMAIL")
+	log.Printf("To: %s", to)
+	log.Printf("Subject: %s", subject)
+	log.Printf("Body: %s", body)
 	log.Println("========================================================")
 	return nil
 }

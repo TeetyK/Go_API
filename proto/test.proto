@@ -2,14 +2,21 @@ syntax = "proto3";
 
 option go_package = "./proto";
 
-service Greeter {
-  rpc SayHello (HelloRequest) returns (HelloReply);
+// The notification service definition.
+service NotificationService {
+  // Sends an email
+  rpc SendEmail (EmailRequest) returns (EmailReply);
 }
 
-message HelloRequest {
-  string name = 1;
+// The request message containing the email details.
+message EmailRequest {
+  string to = 1;
+  string subject = 2;
+  string body = 3;
 }
 
-message HelloReply {
-  string message = 1;
+// The response message confirming the email was sent.
+message EmailReply {
+  bool success = 1;
+  string message = 2;
 }

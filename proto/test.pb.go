@@ -21,27 +21,30 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type HelloRequest struct {
+// The request message containing the email details.
+type EmailRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	To            string                 `protobuf:"bytes,1,opt,name=to,proto3" json:"to,omitempty"`
+	Subject       string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	Body          string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *HelloRequest) Reset() {
-	*x = HelloRequest{}
+func (x *EmailRequest) Reset() {
+	*x = EmailRequest{}
 	mi := &file_proto_test_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *HelloRequest) String() string {
+func (x *EmailRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*HelloRequest) ProtoMessage() {}
+func (*EmailRequest) ProtoMessage() {}
 
-func (x *HelloRequest) ProtoReflect() protoreflect.Message {
+func (x *EmailRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_test_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -53,39 +56,55 @@ func (x *HelloRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HelloRequest.ProtoReflect.Descriptor instead.
-func (*HelloRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use EmailRequest.ProtoReflect.Descriptor instead.
+func (*EmailRequest) Descriptor() ([]byte, []int) {
 	return file_proto_test_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *HelloRequest) GetName() string {
+func (x *EmailRequest) GetTo() string {
 	if x != nil {
-		return x.Name
+		return x.To
 	}
 	return ""
 }
 
-type HelloReply struct {
+func (x *EmailRequest) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *EmailRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+// The response message confirming the email was sent.
+type EmailReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *HelloReply) Reset() {
-	*x = HelloReply{}
+func (x *EmailReply) Reset() {
+	*x = EmailReply{}
 	mi := &file_proto_test_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *HelloReply) String() string {
+func (x *EmailReply) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*HelloReply) ProtoMessage() {}
+func (*EmailReply) ProtoMessage() {}
 
-func (x *HelloReply) ProtoReflect() protoreflect.Message {
+func (x *EmailReply) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_test_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -97,12 +116,19 @@ func (x *HelloReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HelloReply.ProtoReflect.Descriptor instead.
-func (*HelloReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use EmailReply.ProtoReflect.Descriptor instead.
+func (*EmailReply) Descriptor() ([]byte, []int) {
 	return file_proto_test_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *HelloReply) GetMessage() string {
+func (x *EmailReply) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *EmailReply) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -113,14 +139,17 @@ var File_proto_test_proto protoreflect.FileDescriptor
 
 const file_proto_test_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/test.proto\"\"\n" +
-	"\fHelloRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"&\n" +
+	"\x10proto/test.proto\"L\n" +
+	"\fEmailRequest\x12\x0e\n" +
+	"\x02to\x18\x01 \x01(\tR\x02to\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\"@\n" +
 	"\n" +
-	"HelloReply\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage21\n" +
-	"\aGreeter\x12&\n" +
-	"\bSayHello\x12\r.HelloRequest\x1a\v.HelloReplyB\tZ\a./protob\x06proto3"
+	"EmailReply\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2>\n" +
+	"\x13NotificationService\x12'\n" +
+	"\tSendEmail\x12\r.EmailRequest\x1a\v.EmailReplyB\tZ\a./protob\x06proto3"
 
 var (
 	file_proto_test_proto_rawDescOnce sync.Once
@@ -136,12 +165,12 @@ func file_proto_test_proto_rawDescGZIP() []byte {
 
 var file_proto_test_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_proto_test_proto_goTypes = []any{
-	(*HelloRequest)(nil), // 0: HelloRequest
-	(*HelloReply)(nil),   // 1: HelloReply
+	(*EmailRequest)(nil), // 0: EmailRequest
+	(*EmailReply)(nil),   // 1: EmailReply
 }
 var file_proto_test_proto_depIdxs = []int32{
-	0, // 0: Greeter.SayHello:input_type -> HelloRequest
-	1, // 1: Greeter.SayHello:output_type -> HelloReply
+	0, // 0: NotificationService.SendEmail:input_type -> EmailRequest
+	1, // 1: NotificationService.SendEmail:output_type -> EmailReply
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
