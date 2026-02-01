@@ -139,7 +139,7 @@ var File_proto_test_proto protoreflect.FileDescriptor
 
 const file_proto_test_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/test.proto\"L\n" +
+	"\x10proto/test.proto\x12\fnotification\"L\n" +
 	"\fEmailRequest\x12\x0e\n" +
 	"\x02to\x18\x01 \x01(\tR\x02to\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12\x12\n" +
@@ -147,9 +147,9 @@ const file_proto_test_proto_rawDesc = "" +
 	"\n" +
 	"EmailReply\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2>\n" +
-	"\x13NotificationService\x12'\n" +
-	"\tSendEmail\x12\r.EmailRequest\x1a\v.EmailReplyB\tZ\a./protob\x06proto3"
+	"\amessage\x18\x02 \x01(\tR\amessage2X\n" +
+	"\x13NotificationService\x12A\n" +
+	"\tSendEmail\x12\x1a.notification.EmailRequest\x1a\x18.notification.EmailReplyB\tZ\a./protob\x06proto3"
 
 var (
 	file_proto_test_proto_rawDescOnce sync.Once
@@ -165,12 +165,12 @@ func file_proto_test_proto_rawDescGZIP() []byte {
 
 var file_proto_test_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_proto_test_proto_goTypes = []any{
-	(*EmailRequest)(nil), // 0: EmailRequest
-	(*EmailReply)(nil),   // 1: EmailReply
+	(*EmailRequest)(nil), // 0: notification.EmailRequest
+	(*EmailReply)(nil),   // 1: notification.EmailReply
 }
 var file_proto_test_proto_depIdxs = []int32{
-	0, // 0: NotificationService.SendEmail:input_type -> EmailRequest
-	1, // 1: NotificationService.SendEmail:output_type -> EmailReply
+	0, // 0: notification.NotificationService.SendEmail:input_type -> notification.EmailRequest
+	1, // 1: notification.NotificationService.SendEmail:output_type -> notification.EmailReply
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
