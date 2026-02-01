@@ -3,7 +3,6 @@ package controller
 import (
 	"API/config"
 	"API/models"
-	"API/proto"
 	"API/utils"
 	"context"
 	"encoding/json"
@@ -19,8 +18,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"gorm.io/gorm"
 )
 
@@ -358,29 +355,19 @@ func ForgotPasswordV2(c *gin.Context) {
 		return
 	}
 
-	// Set up a connection to the gRPC server.
-	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcResponse, err := utils.SendEmailViaGRPC(input.Email, input.Subject, input.Body)
 	if err != nil {
-		log.Printf("Did not connect to gRPC server: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not connect to notification service"})
-		return
-	}
-	defer conn.Close()
-
-	client := proto.NewNotificationServiceClient(conn)
-
-	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
-	defer cancel()
-
-	_, err = client.SendEmail(ctx, &proto.EmailRequest{To: input.Email, Subject: input.Subject, Body: input.Body})
-	if err != nil {
-		log.Printf("could not send email: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send notification"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "The notification service failed to process the request.",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset instruction sent via gRPC."})
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Request successfully processed by notification service.",
+		"grpc_response": grpcResponse,
+	})
 }
 func ResetPasswordV2(c *gin.Context) {
 	resp, err := http.Post("http://localhost:8001/send-email", "application/json", nil)

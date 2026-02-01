@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package notification;
+
 option go_package = "./proto";
 
 // The notification service definition.
